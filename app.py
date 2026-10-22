@@ -390,3 +390,182 @@ if clasificar:
         fig_prediccion,
         use_container_width=True
     )
+
+# ==========================================
+# ANALISIS DEL COEFICIENTE DE SILUETA
+# ==========================================
+
+st.divider()
+st.subheader("Evaluacion del modelo: coeficiente de silueta")
+
+st.write(
+    "El coeficiente de silueta permite evaluar "
+    "la separacion y cohesion de los clusters. "
+    "Cuanto mayor sea el valor, mejor sera la "
+    "separacion de los grupos."
+)
+
+# Resultados obtenidos durante el entrenamiento
+resultados_silueta = pd.DataFrame({
+    "K": [2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "Silueta": [
+        0.3213,
+        0.4666,
+        0.4939,
+        0.5547,
+        0.5399,
+        0.5281,
+        0.4567,
+        0.4571,
+        0.4362
+    ]
+})
+
+fig_silueta = px.line(
+    resultados_silueta,
+    x="K",
+    y="Silueta",
+    markers=True,
+    title="Coeficiente de silueta para diferentes valores de K"
+)
+
+fig_silueta.add_vline(
+    x=5,
+    line_dash="dash",
+    line_color="red",
+    annotation_text="K optimo = 5"
+)
+
+fig_silueta.update_layout(
+    xaxis_title="Numero de clusters (K)",
+    yaxis_title="Coeficiente de silueta",
+    xaxis=dict(dtick=1),
+    height=450
+)
+
+st.plotly_chart(
+    fig_silueta,
+    use_container_width=True
+)
+
+mejor_k = int(
+    resultados_silueta.loc[
+        resultados_silueta["Silueta"].idxmax(),
+        "K"
+    ]
+)
+
+mejor_silueta = float(
+    resultados_silueta["Silueta"].max()
+)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.metric("Mejor numero de clusters", mejor_k)
+
+with col2:
+    st.metric(
+        "Mejor coeficiente de silueta",
+        f"{mejor_silueta:.4f}"
+    )
+
+st.info(
+    "K=5 obtuvo el mayor coeficiente de silueta "
+    "entre los valores evaluados, respaldando "
+    "la seleccion del modelo final."
+)
+
+# ==========================================
+# ANALISIS COMERCIAL DE LOS SEGMENTOS
+# ==========================================
+
+st.divider()
+st.subheader("Analisis comercial de los cinco segmentos")
+
+st.write(
+    "Los clusters identificados permiten agrupar "
+    "clientes con comportamientos similares y "
+    "proponer estrategias comerciales diferenciadas."
+)
+
+resumen_segmentos = (
+    clientes.groupby("Cluster")
+    .agg(
+        Clientes=("CustomerID", "count"),
+        Ingreso_promedio=("Annual Income (k$)", "mean"),
+        Gasto_promedio=("Spending Score (1-100)", "mean")
+    )
+    .reset_index()
+)
+
+resumen_segmentos["Porcentaje"] = (
+    resumen_segmentos["Clientes"]
+    / len(clientes) * 100
+)
+
+resumen_segmentos["Perfil"] = (
+    resumen_segmentos["Cluster"].map(perfiles)
+)
+
+resumen_segmentos["Estrategia"] = (
+    resumen_segmentos["Cluster"].map(estrategias)
+)
+
+resumen_segmentos = resumen_segmentos.rename(
+    columns={
+        "Cluster": "Cluster",
+        "Clientes": "Cantidad de clientes",
+        "Ingreso_promedio": "Ingreso promedio (k$)",
+        "Gasto_promedio": "Spending Score promedio",
+        "Porcentaje": "Porcentaje (%)",
+        "Perfil": "Perfil comercial",
+        "Estrategia": "Estrategia recomendada"
+    }
+)
+
+st.dataframe(
+    resumen_segmentos.round(2),
+    use_container_width=True,
+    hide_index=True
+)
+
+# Distribucion porcentual de clientes
+fig_distribucion = px.bar(
+    resumen_segmentos,
+    x="Perfil comercial",
+    y="Cantidad de clientes",
+    color="Cluster",
+    title="Distribucion de clientes por segmento",
+    text="Cantidad de clientes"
+)
+
+fig_distribucion.update_layout(
+    xaxis_title="Segmento comercial",
+    yaxis_title="Numero de clientes",
+    height=500
+)
+
+st.plotly_chart(
+    fig_distribucion,
+    use_container_width=True
+)
+
+# Descargar resultados
+st.subheader("Descargar resultados de segmentacion")
+
+csv_resultados = clientes.to_csv(
+    index=False
+).encode("utf-8")
+
+st.download_button(
+    label="Descargar clientes segmentados (CSV)",
+    data=csv_resultados,
+    file_name="clientes_segmentados_kmeans.csv",
+    mime="text/csv"
+)
+
+st.caption(
+    "Las estrategias comerciales son recomendaciones "
+    "basadas en los perfiles identificados por K-Means."
+)
